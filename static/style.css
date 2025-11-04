@@ -1,0 +1,17 @@
+body {
+    background-color: #e8f9ec;
+    font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.card {
+    background-color: #c9f4d4;
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    color: #0b3b2e;
+}
