@@ -11,24 +11,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy to server (password)
+      # مرحله 1: فقط تست اتصال SSH
+      - name: SSH ping
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SSH_HOST }}        # 178.239.151.73
-          username: ${{ secrets.SSH_USER }}    # root
-          password: ${{ secrets.SSH_PASSWORD }}# Software@123456
+          host: ${{ secrets.SSH_HOST }}       # 178.239.151.73
+          username: ${{ secrets.SSH_USER }}   # root
+          password: ${{ secrets.SSH_PASSWORD }} # Software@123456
+          port: 22
+          command_timeout: 15m
+          script: |
+            echo "Connected as $(whoami) on $(hostname)"
+            uname -a
+
+      # مرحله 2: دیپلوی فقط وقتی مرحله 1 موفق شد
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: 22
+          command_timeout: 30m
           script: |
             set -e
             APP_DIR=/var/www/sara-music-card
 
-            # نیازمندی‌ها
             command -v git >/dev/null || (apt-get update && apt-get install -y git)
             command -v python3 >/dev/null || (apt-get update && apt-get install -y python3 python3-venv python3-pip)
 
-            # پوشه پروژه
             mkdir -p $APP_DIR
-
-            # کلون بار اول، بعد از آن pull
             if [ ! -d "$APP_DIR/.git" ]; then
               git clone https://github.com/${{ github.repository }} $APP_DIR
             else
@@ -41,7 +53,6 @@ jobs:
             pip install -U pip
             [ -f requirements.txt ] && pip install -r requirements.txt || true
 
-            # ری‌استارت ساده برنامه
             pkill -f "python3 app.py" || true
             nohup python3 app.py > app.log 2>&1 &
             echo "✅ Deploy done"
