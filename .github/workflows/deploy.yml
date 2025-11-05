@@ -7,7 +7,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,11 +23,13 @@ jobs:
           script: |
             set -e
             APP_DIR=/var/www/sara-music-card
-            echo "🔧 Starting deploy on $APP_DIR"
+            echo "🔧 Deploying to $APP_DIR"
 
+            # پیش‌نیازها
             command -v git >/dev/null || (apt-get update && apt-get install -y git)
             command -v python3 >/dev/null || (apt-get update && apt-get install -y python3 python3-venv python3-pip)
 
+            # کلون/پول
             mkdir -p $APP_DIR
             if [ ! -d "$APP_DIR/.git" ]; then
               git clone https://github.com/${{ github.repository }} $APP_DIR
@@ -36,23 +37,33 @@ jobs:
               cd $APP_DIR && git pull
             fi
 
+            # ویرچوال‌انوی
             cd $APP_DIR
             python3 -m venv venv || python -m venv venv
             . venv/bin/activate
             pip install -U pip
             [ -f requirements.txt ] && pip install -r requirements.txt || true
 
-            # Flask app restart safely
-            pkill -f "python3 app.py" || true
+            # پورت‌ها را خالی کن (nginx روی 5000 است؛ ما 5001 را برای Flask می‌گیریم)
+            fuser -k 5001/tcp || true
+            fuser -k 5000/tcp || true
+
+            # اجرای Flask در بک‌گراند (لاگ داخل app.log)
             nohup python3 app.py > app.log 2>&1 &
             sleep 5
 
+            # هلس‌چک
             if pgrep -f "python3 app.py" > /dev/null; then
-              echo "✅ Flask app running successfully!"
+              echo "✅ Flask process up"
             else
-              echo "❌ Flask app failed to start"
-              exit 1
+              echo "❌ Flask failed to start"; tail -n 100 app.log; exit 1
             fi
 
-            echo "🚀 Deploy finished successfully!"
+            # تست HTTP لوکال
+            if curl -fsS http://127.0.0.1:5001 >/dev/null; then
+              echo "🚀 Deploy finished successfully!"
+            else
+              echo "❌ Health check failed"; tail -n 100 app.log; exit 1
+            fi
+
             exit 0
